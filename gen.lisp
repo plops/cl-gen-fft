@@ -21,9 +21,10 @@
     (setf (ldb (byte 1 i) res) (ldb (byte 1 (- n 1 i)) x)))
   res))
 
-(let* ((n 32)
+(let* ((n 512)
       (code `(with-compilation-unit
-		 (include <iostream>)		 
+		 (include <iostream>)
+	        (include <iomanip>)		 
 	       (include <cmath>)
 	       (include <algorithm>)
 	       (include <array>)
@@ -36,6 +37,7 @@
 			  
 			  (m_fft_in :type "std::array<std::complex<float>,M_MAG_N>"  :init (list (list ,@ (loop for i below n collect 0.0))))
 			  (m_fft_out :type "std::array<std::complex<float>,M_MAG_N>"  :init (list (list ,@ (loop for i below n collect 0.0))))
+			  (m_fft_out2 :type "std::array<std::complex<float>,M_MAG_N>"  :init (list (list ,@ (loop for i below n collect 0.0))))
 			  (m_fft_out_mag :type "std::array<float,M_MAG_N>" :init (list (list ,@ (loop for i below n collect 0.0))))
 			  )))
 
@@ -56,17 +58,19 @@
 	       ;; https://en.wikipedia.org/wiki/Cooley%E2%80%93Tukey_FFT_algorithm
 	       (function  (bit_reverse_copy ((in :type "const std::array<std::complex<float>, N > &")
 					     (out :type "std::array<std::complex<float>, N > &"))
-					    "inline template<std::size_t N > void")
+					    "template<std::size_t N > void")
 			  (setf ,@(loop for i below n appending
 				  `((aref out ,(rev i n)) (aref in ,i)))))
 	       (function
-		(iterative_fft ((in :type "const std::array<std::complex<float>, N > &")
+		(fft ((in :type "const std::array<std::complex<float>, N > &")
 				(out :type "std::array<std::complex<float>, N > &"))
 			       "template<std::size_t N > void")
 		(funcall bit_reverse_copy in out)
-		,@(loop for s below (floor (log n 2)) appending
+		,@(loop for s from 1 upto (floor (log n 2)) appending
 		       (let ((m (expt 2 s)))
-			 `((let ((w_m :init (funcall "const std::complex<float>" 0.0 ,(/ (* pi -2) m))))
+			 `((let ((w_m :type "const auto" :init (funcall "std::complex<float>"
+									,(coerce (cos (/ (* pi -2) m)) 'single-float)
+									,(coerce (sin (/ (* pi -2) m)) 'single-float))))
 			     (for ((k 0) (< k N) (+= k ,m))
 				  (let ((w :type "std::complex<float>" :ctor 1))
 				    (dotimes (j ,(/ m 2))
@@ -88,6 +92,7 @@
 				    (statements
 				     (funcall ))))))
 	       ;; https://stackoverflow.com/questions/10121574/safe-and-fast-fft
+	       #+nil
 	       (function (fft ((zs :type "std::array<std::complex<float>, N > &"))
 			      "template<std::size_t N> void")
 			 (let ((j :type "unsigned int" :ctor 0))
@@ -122,34 +127,23 @@
 			    (setf (aref m_fft_in i) 0.0
 				  (aref m_fft_out i) 0.0
 				  (aref m_fft_out_mag i) 0.0))
-			  (setf (aref m_fft_in 12) 1.0)
+			  (setf (aref m_fft_in 1) 1.0)
 			  (funcall ft m_fft_in m_fft_out))
 
 			 (statements
 			  (dotimes (i M_MAG_N)
 			    (setf (aref m_fft_in i) 0.0
-				  (aref m_fft_out i) 0.0
+				  (aref m_fft_out2 i) 0.0
 				  (aref m_fft_out_mag i) 0.0))
-			  (setf (aref m_fft_in 12) 1.0)
-			  (funcall fft m_fft_in))
+			  (setf (aref m_fft_in 1) 1.0)
+			  (funcall fft m_fft_in m_fft_out2))
 			 
 			 #+nil (dotimes  (i M_MAG_N)
 				 (setf (aref m_fft_out_mag i) (funcall "std::abs" (aref m_fft_out i))))
 			 
 			 (dotimes (i M_MAG_N)
-			   (macroexpand (e i (string " ") (aref m_fft_out i) (aref m_fft_in i) (string " ") (funcall "std::exp"
-												   (funcall "std::complex<float>"
-													    0s0
-													    (/ (* M_PI -2 i)
-													       M_MAG_N))))))))))
+			   (macroexpand (e (funcall "std::setw" 6) i (funcall "std::setw" 30) (aref m_fft_out i) (funcall "std::setw" 30) (aref m_fft_out2 i))))))))
   (write-source "/home/martin/stage/cl-gen-fft/source/main" "cpp" code))
 
 
 
-
-
-(ash)
-
-(rev #b111001101 2048)
-
-#b111001
