@@ -21,7 +21,7 @@
     (setf (ldb (byte 1 i) res) (ldb (byte 1 (- n 1 i)) x)))
   res))
 
-(let* ((n 512)
+(let* ((n 32)
       (code `(with-compilation-unit
 		 (include <iostream>)
 	        (include <iomanip>)		 
