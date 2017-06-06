@@ -4,6 +4,7 @@
 #include <complex>
 #include <iomanip>
 #include <iostream>
+#include <sys/time.h>
 enum Constants { M_MAG_N = 32 };
 
 std::array<std::complex<float>, M_MAG_N> m_fft_in = {
@@ -35,6 +36,13 @@ std::array<float, M_MAG_N> m_fft_out_mag = {
      (0.0e+0f), (0.0e+0f), (0.0e+0f), (0.0e+0f), (0.0e+0f), (0.0e+0f),
      (0.0e+0f), (0.0e+0f)}};
 
+static inline uint64_t current_time() {
+  {
+    struct timeval tv;
+    gettimeofday(&tv, nullptr);
+    return ((tv.tv_sec * 1000000) + tv.tv_usec);
+  }
+}
 template <std::size_t N>
 void ft(const std::array<std::complex<float>, N> &in,
         std::array<std::complex<float>, N> &out) {
@@ -182,14 +190,28 @@ int main() {
     m_fft_out_mag[i] = (0.0e+0f);
   }
   m_fft_in[1] = (1.e+0f);
-  ft(m_fft_in, m_fft_out);
+  {
+    auto start(current_time());
+    for (unsigned int i = 0; (i < 10); i += 1) {
+      ft(m_fft_in, m_fft_out);
+    }
+    (std::cout << "time: " << (((1.e+0f) / (1.e+3f)) * (current_time() - start))
+               << " ms" << std::endl);
+  }
   for (unsigned int i = 0; (i < M_MAG_N); i += 1) {
     m_fft_in[i] = (0.0e+0f);
     m_fft_out2[i] = (0.0e+0f);
     m_fft_out_mag[i] = (0.0e+0f);
   }
   m_fft_in[1] = (1.e+0f);
-  fft(m_fft_in, m_fft_out2);
+  {
+    auto start(current_time());
+    for (unsigned int i = 0; (i < 10); i += 1) {
+      fft(m_fft_in, m_fft_out2);
+    }
+    (std::cout << "time: " << (((1.e+0f) / (1.e+3f)) * (current_time() - start))
+               << " ms" << std::endl);
+  }
   for (unsigned int i = 0; (i < M_MAG_N); i += 1) {
     (std::cout << std::setw(6) << i << std::setw(30) << m_fft_out[i]
                << std::setw(30) << m_fft_out2[i] << std::endl);

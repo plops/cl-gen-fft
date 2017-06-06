@@ -14,6 +14,12 @@
   `(statements (<< "std::cout" ,@(loop for e in body collect
 				      (cond ((stringp e) `(string ,e))
 					    (t e))) "std::endl")))
+
+(defmacro benchmark (&body body)
+  `(let ((start :ctor (funcall current_time)))
+     ,@body
+     (macroexpand (e "time: " (* (/ 1.0 1000.0) (- (funcall current_time) start)) " ms"))
+     ))
 (defun rev (x nn)
   (let ((n (floor (log nn 2)))
       (res 0))
@@ -29,10 +35,11 @@
 	       (include <algorithm>)
 	       (include <array>)
 	       (include <complex>)
+	       (include <sys/time.h>) ;; gettimeofday
 
 	       (with-compilation-unit
 		     (enum Constants (M_MAG_N ,n))
-
+		 
 		   (decl (
 			  
 			  (m_fft_in :type "std::array<std::complex<float>,M_MAG_N>"  :init (list (list ,@ (loop for i below n collect 0.0))))
@@ -40,6 +47,12 @@
 			  (m_fft_out2 :type "std::array<std::complex<float>,M_MAG_N>"  :init (list (list ,@ (loop for i below n collect 0.0))))
 			  (m_fft_out_mag :type "std::array<float,M_MAG_N>" :init (list (list ,@ (loop for i below n collect 0.0))))
 			  )))
+	       (function (current_time () "static inline uint64_t")
+                                         
+                                         (let ((tv :type "struct timeval"))
+                                           (funcall gettimeofday &tv nullptr)
+                                           (return (+ (* tv.tv_sec 1000000)
+                                                      tv.tv_usec))))
 
 	       (function (ft ((in :type "const std::array<std::complex<float>, N > &" )
 			      (out :type "std::array<std::complex<float>, N > &" ))
@@ -128,7 +141,9 @@
 				  (aref m_fft_out i) 0.0
 				  (aref m_fft_out_mag i) 0.0))
 			  (setf (aref m_fft_in 1) 1.0)
-			  (funcall ft m_fft_in m_fft_out))
+			  (macroexpand (benchmark
+					(dotimes (i 10)
+					  (funcall ft m_fft_in m_fft_out)))))
 
 			 (statements
 			  (dotimes (i M_MAG_N)
@@ -136,7 +151,9 @@
 				  (aref m_fft_out2 i) 0.0
 				  (aref m_fft_out_mag i) 0.0))
 			  (setf (aref m_fft_in 1) 1.0)
-			  (funcall fft m_fft_in m_fft_out2))
+			  (macroexpand (benchmark
+			     (dotimes (i 10)
+			       (funcall fft m_fft_in m_fft_out2)))))
 			 
 			 #+nil (dotimes  (i M_MAG_N)
 				 (setf (aref m_fft_out_mag i) (funcall "std::abs" (aref m_fft_out i))))
